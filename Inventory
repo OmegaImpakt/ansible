@@ -1,0 +1,2 @@
+[redhat]
+web  ansible_host=nginx.omega.local  ansible_ssh_pass=semsem
