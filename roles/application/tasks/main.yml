@@ -1,9 +1,9 @@
 ---
-# - name: Block remote MySQL access (3306) — security hardening
-#   ansible.posix.firewalld:
-#     port: 5000/tcp
-#     state: enabled
-#     permanent: true
+- name: Block remote MySQL access (3306) — security hardening
+  ansible.posix.firewalld:
+    port: 5000/tcp
+    state: enabled
+    permanent: true
 
 - name: Install Flask and MySQL connector
   ansible.builtin.pip:
@@ -12,11 +12,11 @@
     - flask-mysql
     state: present
 
-# - name: Deploy web application repo
-#   ansible.builtin.git:
-#     repo: "https://github.com/mmumshad/simple-webapp.git"
-#     dest: /var/www/simple-webapp
-#     version: master
+- name: Deploy web application repo
+  ansible.builtin.git:
+    repo: "https://github.com/mmumshad/simple-webapp.git"
+    dest: /var/www/simple-webapp
+    version: master
   # COMMENT:
   #   Deploy under /var/www — system paths, not home folders.
 
