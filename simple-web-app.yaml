@@ -1,6 +1,7 @@
 ---
 - name: Install MySQL
   hosts: web
+  become: true
   roles:
     - database
     - application

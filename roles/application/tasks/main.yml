@@ -1,104 +1,42 @@
 ---
-# tasks file for application
-- name: Import MySQL GPG Key
-  ansible.builtin.rpm_key:
-    state: present
-    key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-  become: true
+# - name: Block remote MySQL access (3306) — security hardening
+#   ansible.posix.firewalld:
+#     port: 5000/tcp
+#     state: enabled
+#     permanent: true
 
-- name: Download MySQL repository RPM
-  ansible.builtin.dnf:
-    name: https://repo.mysql.com/mysql84-community-release-el9-2.noarch.rpm
-    state: present
-  become: true
-
-- name: Install MySQL & dependencies
-  ansible.builtin.dnf: name={{ item }} state=installed
-  with_items:
-  - mysql
-  - mysql-server
-  - python3-PyMySQL
-  - python3-pip-wheel
-  - '@Development tools'
-  - python3-devel.x86_64
-  - python3-setuptools
-  become: true
-
-- name: Stop mysqld service
-  ansible.builtin.service:
-    name: mysqld
-    state: stopped
-  become: true
-
-- name: Set MySQL skip-grant-tables mode
-  ansible.builtin.command: >
-    systemctl set-environment MYSQLD_OPTS="--skip-grant-tables --skip-networking"
-  become: true
-
-- name: Start mysqld in skip-grant-tables mode
-  ansible.builtin.service:
-    name: mysqld
-    state: started
-  become: true
-
-- name: Reset MySQL root password
-  community.mysql.mysql_query:
-    login_unix_socket: /var/lib/mysql/mysql.sock
-    query:
-    - "FLUSH PRIVILEGES;"
-    - "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '{{ db_root_password }}';"
-    - "FLUSH PRIVILEGES;"
-  become: true
-
-- name: Stop mysqld service after password reset
-  ansible.builtin.service:
-    name: mysqld
-    state: stopped
-  become: true
-
-- name: Unset MySQL environment options
-  ansible.builtin.command: systemctl unset-environment MYSQLD_OPTS
-  become: true
-
-- name: Start mysqld service normally
-  ansible.builtin.service:
-    name: mysqld
-    state: started
-    enabled: true
-  become: true
-
-- name: Set root password
-  community.mysql.mysql_query:
-    name: "{{ db_root_user }}"
-    password: "{{ db_root_password }}"
-    host: localhost
-    login_unix_socket: /var/lib/mysql/mysql.sock
-
-- name: Create employee_db
-  community.mysql.mysql_db:
-    login_user: "{{ db_root_user }}"
-    login_password: "{{ db_root_password }}"
-    name: "{{ db_name }}"
+- name: Install Flask and MySQL connector
+  ansible.builtin.pip:
+    name:
+    - flask
+    - flask-mysql
     state: present
 
-- name: Create MySQL user for localhost
-  community.mysql.mysql_user:
-    login_user: "{{ db_root_user }}"
-    login_password: "{{ db_root_password }}"
-    name: "{{ db_user }}"
-    host: "localhost"
-    password: "{{ db_user_password }}"
-    plugin: mysql_native_password
-    priv: "*.*:ALL"
-    state: present
+# - name: Deploy web application repo
+#   ansible.builtin.git:
+#     repo: "https://github.com/mmumshad/simple-webapp.git"
+#     dest: /var/www/simple-webapp
+#     version: master
+  # COMMENT:
+  #   Deploy under /var/www — system paths, not home folders.
 
-- name: Create database user for remote access
-  community.mysql.mysql_user:
-    login_user: "{{ db_root_user }}"
-    login_password: "{{ db_root_password }}"
-    name: "{{ db_user }}"
-    host: "%"
-    password: "{{ db_user_password }}"
-    plugin: mysql_native_password
-    priv: "*.*:ALL"
-    state: present
+- name: Create non-root user for running the Flask app
+  ansible.builtin.user:
+    name: webapp
+    system: yes
+    shell: /sbin/nologin
+  # COMMENT:
+  #   NEVER run Flask app as root.
+
+- name: Fix application permissions
+  ansible.builtin.file:
+    path: /var/www/simple-webapp
+    owner: webapp
+    group: webapp
+    recurse: yes
+  # COMMENT:
+  #   Principle of least privilege — app owns only what it needs.
+
+- name: Starting the web server
+  ansible.builtin.shell:
+    python -m flask --app /var/www/simple-webapp/app.py run --host=0.0.0.0 &

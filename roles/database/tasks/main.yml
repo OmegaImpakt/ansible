@@ -1,104 +1,127 @@
 ---
 # tasks file for database
-- name: Import MySQL GPG Key
-  ansible.builtin.rpm_key:
-    state: present
-    key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-  become: true
+# - name: Import MySQL GPG Key
+#   ansible.builtin.rpm_key:
+#     state: present
+#     key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+#   become: true
 
-- name: Download MySQL repository RPM
-  ansible.builtin.dnf:
-    name: https://repo.mysql.com/mysql84-community-release-el9-2.noarch.rpm
-    state: present
-  become: true
+# - name: Download MySQL repository RPM
+#   ansible.builtin.dnf:
+#     name: https://repo.mysql.com/mysql84-community-release-el9-2.noarch.rpm
+#     state: present
+#   become: true
 
-- name: Install MySQL & dependencies
-  ansible.builtin.dnf: name={{ item }} state=installed
-  with_items:
-  - mysql
-  - mysql-server
-  - python3-PyMySQL
-  - python3-pip-wheel
-  - '@Development tools'
-  - python3-devel.x86_64
-  - python3-setuptools
-  become: true
+# - name: Install MySQL server & dependencies
+#   ansible.builtin.dnf:
+#     name:
+#       - mysql-server
+#       - python3-PyMySQL
+#     state: present
 
-- name: Stop mysqld service
-  ansible.builtin.service:
-    name: mysqld
-    state: stopped
-  become: true
+# - name: Stop mysqld service
+#   ansible.builtin.service:
+#     name: mysqld
+#     state: stopped
+#   become: true
 
-- name: Set MySQL skip-grant-tables mode
-  ansible.builtin.command: >
-    systemctl set-environment MYSQLD_OPTS="--skip-grant-tables --skip-networking"
-  become: true
+# - name: Set MySQL skip-grant-tables mode
+#   ansible.builtin.command: >
+#     systemctl set-environment MYSQLD_OPTS="--skip-grant-tables --skip-networking"
+#   become: true
 
-- name: Start mysqld in skip-grant-tables mode
-  ansible.builtin.service:
-    name: mysqld
-    state: started
-  become: true
+# - name: Start mysqld in skip-grant-tables mode
+#   ansible.builtin.service:
+#     name: mysqld
+#     state: started
+#   become: true
 
-- name: Reset MySQL root password
-  community.mysql.mysql_query:
-    login_unix_socket: /var/lib/mysql/mysql.sock
-    query:
-    - "FLUSH PRIVILEGES;"
-    - "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '{{ db_root_password }}';"
-    - "FLUSH PRIVILEGES;"
-  become: true
+# - name: Reset MySQL root password
+#   community.mysql.mysql_query:
+#     login_unix_socket: /var/lib/mysql/mysql.sock
+#     query:
+#     - "FLUSH PRIVILEGES;"
+#     - "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '{{ db_root_password }}';"
+#     - "FLUSH PRIVILEGES;"
+#   become: true
 
-- name: Stop mysqld service after password reset
-  ansible.builtin.service:
-    name: mysqld
-    state: stopped
-  become: true
+# - name: Stop mysqld service after password reset
+#   ansible.builtin.service:
+#     name: mysqld
+#     state: stopped
+#   become: true
 
-- name: Unset MySQL environment options
-  ansible.builtin.command: systemctl unset-environment MYSQLD_OPTS
-  become: true
+# - name: Unset MySQL environment options
+#   ansible.builtin.command: systemctl unset-environment MYSQLD_OPTS
+#   become: true
 
-- name: Start mysqld service normally
-  ansible.builtin.service:
-    name: mysqld
-    state: started
-    enabled: true
-  become: true
+# - name: Start mysqld service normally
+#   ansible.builtin.service:
+#     name: mysqld
+#     state: started
+#     enabled: true
+#   become: true
 
-- name: Set root password
-  community.mysql.mysql_query:
-    name: "{{ db_root_user }}"
-    password: "{{ db_root_password }}"
-    host: localhost
-    login_unix_socket: /var/lib/mysql/mysql.sock
+# - name: Ensure root password is set securely
+#   community.mysql.mysql_user:
+#     name: "{{ db_root_user }}"
+#     host: localhost
+#     login_unix_socket: /var/lib/mysql/mysql.sock
+#     password: "{{ db_root_password }}"
+#     state: present
+  # COMMENT:
+  #   Avoids disabling MySQL authentication entirely.
+  #   Using the UNIX socket secure auth method.
 
-- name: Create employee_db
+  ###########################################################################
+  # SECTION 3 — DATABASE CREATION
+  ###########################################################################
+
+- name: Create employee database
   community.mysql.mysql_db:
     login_user: "{{ db_root_user }}"
     login_password: "{{ db_root_password }}"
+    login_host: localhost
     name: "{{ db_name }}"
     state: present
 
-- name: Create MySQL user for localhost
+###########################################################################
+# SECTION 4 — USER CREATION WITH LEAST PRIVILEGE
+###########################################################################
+
+- name: Create MySQL user (local only)
   community.mysql.mysql_user:
     login_user: "{{ db_root_user }}"
     login_password: "{{ db_root_password }}"
+    login_host: localhost
     name: "{{ db_user }}"
     host: "localhost"
     password: "{{ db_user_password }}"
-    plugin: mysql_native_password
-    priv: "*.*:ALL"
+    priv: "{{ db_name }}.*:ALL"
     state: present
+  # COMMENT:
+  #   DO NOT grant "*.*:ALL" (very insecure)
+  #   Restrict to the application database only.
+  #   Removed remote access unless absolutely necessary.
 
-- name: Create database user for remote access
+  # Optional: remove remote access completely (recommended)
+- name: Remove public remote access for db_user
   community.mysql.mysql_user:
     login_user: "{{ db_root_user }}"
     login_password: "{{ db_root_password }}"
     name: "{{ db_user }}"
     host: "%"
-    password: "{{ db_user_password }}"
-    plugin: mysql_native_password
-    priv: "*.*:ALL"
-    state: present
+    state: absent
+  # COMMENT:
+  #   % (any IP) is extremely dangerous. Remove it unless explicitly required.
+
+  ###########################################################################
+  # SECTION 5 — FIREWALL HARDENING
+  ###########################################################################
+
+
+# - name: Block remote MySQL access (3306) — security hardening
+#   ansible.posix.firewalld:
+#     port: 3306/tcp
+#     state: enabled
+#     permanent: true
