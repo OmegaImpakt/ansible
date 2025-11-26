@@ -1,26 +1,28 @@
-# - name: Import MySQL GPG Key
-#   ansible.builtin.rpm_key:
-#     state: present
-#     key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
-#   become: true
+---
+# tasks file for application
+- name: Import MySQL GPG Key
+  ansible.builtin.rpm_key:
+    state: present
+    key: https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
+  become: true
 
-# - name: Download MySQL repository RPM
-#   ansible.builtin.dnf:
-#     name: https://repo.mysql.com/mysql84-community-release-el9-2.noarch.rpm
-#     state: present
-#   become: true
+- name: Download MySQL repository RPM
+  ansible.builtin.dnf:
+    name: https://repo.mysql.com/mysql84-community-release-el9-2.noarch.rpm
+    state: present
+  become: true
 
-# - name: Install MySQL & dependencies
-#   ansible.builtin.dnf: name={{ item }} state=installed
-#   with_items:
-#   - mysql
-#   - mysql-server
-#   - python3-PyMySQL
-#   - python3-pip-wheel
-#   - '@Development tools'
-#   - python3-devel.x86_64
-#   - python3-setuptools
-#   become: true
+- name: Install MySQL & dependencies
+  ansible.builtin.dnf: name={{ item }} state=installed
+  with_items:
+  - mysql
+  - mysql-server
+  - python3-PyMySQL
+  - python3-pip-wheel
+  - '@Development tools'
+  - python3-devel.x86_64
+  - python3-setuptools
+  become: true
 
 - name: Stop mysqld service
   ansible.builtin.service:

@@ -1,0 +1,15 @@
+# - name: Install Flask and its dependencies
+#   ansible.builtin.pip:
+#     name: "{{ item }}"
+#     state: present
+#   with_items:
+#   - flask
+#   - flask-mysql
+
+- name: Cloning the repository
+  ansible.builtin.git:
+    repo: 'https://github.com/mmumshad/simple-webapp.git'
+    dest: /home/omegaimpakt/simple-webapp
+
+- name: Starting the web server
+  ansible.builtin.shell: flask --app /home/omegaimpakt/simple-webapp/app.py run --host=0.0.0.0

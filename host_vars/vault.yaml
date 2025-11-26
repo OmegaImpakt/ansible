@@ -1,0 +1,7 @@
+ansible_ssh_pass: semsem
+
+db_root_user: root
+db_root_password: "H0$@m_3142"
+db_name: employee_db
+db_user: omegaimpakt
+db_user_password: "H0$@m_9997"
